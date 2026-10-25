@@ -1,5 +1,23 @@
 #import <Foundation/Foundation.h>
 #import "include/FirebreakNative.h"
+
+#if MAS_BUILD
+
+// Mac App Store build stub: omits private IOKit HID APIs to comply with Guideline 2.5.1
+NSDictionary<NSString *, NSNumber *> *FBReadHardwareSensors(void) {
+    return @{};
+}
+
+double FBGetMaxDieTemperatureCelsius(void) {
+    return -1.0;
+}
+
+double FBGetAverageDieTemperatureCelsius(void) {
+    return -1.0;
+}
+
+#else
+
 #include <IOKit/hidsystem/IOHIDEventSystemClient.h>
 
 typedef struct __IOHIDEvent *IOHIDEventRef;
@@ -122,3 +140,5 @@ double FBGetAverageDieTemperatureCelsius(void) {
     }
     return count > 0 ? (sum / (double)count) : -1.0;
 }
+
+#endif

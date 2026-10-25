@@ -3,12 +3,26 @@ options:
   bundleIdPrefix: com.jcyrus
   deploymentTarget:
     macOS: "14.0"
+configs:
+  Debug: debug
+  Release: release
+  AppStore: release
+
+settings:
+  base:
+    GENERATE_INFOPLIST_FILE: YES
+
 targets:
   FirebreakNative:
     type: framework
     platform: macOS
     sources:
       - Sources/FirebreakNative
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      configs:
+        AppStore:
+          GCC_PREPROCESSOR_DEFINITIONS: MAS_BUILD=1
 
   FirebreakCore:
     type: framework
@@ -19,6 +33,10 @@ targets:
       - target: FirebreakNative
     settings:
       SWIFT_VERSION: "6.0"
+      GENERATE_INFOPLIST_FILE: YES
+      configs:
+        AppStore:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: MAS_BUILD
       
   firebreak:
     type: tool
@@ -33,18 +51,41 @@ targets:
   FirebreakApp:
     type: application
     platform: macOS
+    bundleId: com.jcyrus.firebreak
     sources:
       - Sources/FirebreakApp
     dependencies:
       - target: FirebreakCore
     info:
       path: Sources/FirebreakApp/Info.plist
+      properties:
+        CFBundleIconFile: AppIcon
+        CFBundleIconName: AppIcon
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "2"
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSUIElement: true
+        ITSAppUsesNonExemptEncryption: false
     settings:
-      SWIFT_VERSION: "6.0"
-      PRODUCT_BUNDLE_IDENTIFIER: com.jcyrus.firebreak
-      INFOPLIST_FILE: Sources/FirebreakApp/Info.plist
-      GENERATE_INFOPLIST_KEY_LSUIElement: YES
-      GENERATE_INFOPLIST_KEY_CFBundleIconFile: AppIcon
-      GENERATE_INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
-      CODE_SIGN_ENTITLEMENTS: Sources/FirebreakApp/Firebreak.entitlements
-      DEVELOPMENT_TEAM: JVXU55D96B
+      base:
+        SWIFT_VERSION: "6.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.jcyrus.firebreak
+        INFOPLIST_FILE: Sources/FirebreakApp/Info.plist
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "2"
+        INFOPLIST_KEY_CFBundleShortVersionString: "1.0.0"
+        INFOPLIST_KEY_CFBundleVersion: "2"
+        INFOPLIST_KEY_CFBundleIconFile: AppIcon
+        INFOPLIST_KEY_CFBundleIconName: AppIcon
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        DEVELOPMENT_TEAM: JVXU55D96B
+      configs:
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: com.jcyrus.firebreak
+          CODE_SIGN_ENTITLEMENTS: Sources/FirebreakApp/Firebreak.entitlements
+        AppStore:
+          PRODUCT_BUNDLE_IDENTIFIER: com.jcyrus.firebreak
+          CODE_SIGN_ENTITLEMENTS: Sources/FirebreakApp/Firebreak-AppStore.entitlements
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: MAS_BUILD
