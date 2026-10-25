@@ -7,3 +7,4 @@ DerivedData/
 !project.yml
 *.xcworkspace
 .swiftpm/
+dist/

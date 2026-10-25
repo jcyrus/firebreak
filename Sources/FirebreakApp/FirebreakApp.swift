@@ -31,7 +31,7 @@ struct FirebreakApp: App {
     private var menuBarIcon: String {
         switch watchdog.latestReport.severity {
         case .critical:
-            return "flame.fill"
+            return "exclamationmark.triangle.fill"
         case .warning:
             return "flame.fill"
         case .normal:

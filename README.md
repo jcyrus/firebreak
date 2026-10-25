@@ -26,6 +26,15 @@ Unlike passive monitors that only show a temperature reading in the menu bar, Fi
 
 ## Usage
 
+### Menu Bar App (recommended: bundled)
+```zsh
+./scripts/bundle-app.sh
+open dist/Firebreak.app
+```
+Interactive notification buttons (Shutdown / Freeze / Kill) require the bundled `.app`.
+`swift run FirebreakApp` also works for development, but alerts fall back to plain
+`osascript` banners without action buttons.
+
 ### Quick Status
 ```zsh
 swift run firebreak status
