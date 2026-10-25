@@ -14,7 +14,7 @@ struct FirebreakApp: App {
         MenuBarExtra {
             MenuBarView(watchdog: watchdog)
                 .onAppear {
-                    watchdog.startMonitoring(interval: 3.0)
+                    watchdog.startMonitoring()
                 }
         } label: {
             HStack(spacing: 4) {

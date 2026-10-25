@@ -240,6 +240,10 @@ public struct MenuBarView: View {
                 .font(.caption2)
                 .toggleStyle(.checkbox)
             
+            Text("• \(watchdog.currentCadence.rawValue)")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            
             Spacer()
             
             Button("Quit") {

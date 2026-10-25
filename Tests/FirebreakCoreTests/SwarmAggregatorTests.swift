@@ -48,4 +48,21 @@ struct FirebreakCoreTests {
         #expect(report.severity == .critical)
         #expect(report.recommendedAction == .shutdownSimulator)
     }
+    
+    @Test("ProcessEnumerator path cache reuses lookups cleanly")
+    func testProcessEnumeratorCaching() async {
+        let enumerator = ProcessEnumerator()
+        let sample1 = await enumerator.snapshot(sampleInterval: 0.05)
+        #expect(!sample1.isEmpty)
+        
+        let sample2 = await enumerator.snapshot(sampleInterval: 0.05)
+        #expect(!sample2.isEmpty)
+    }
+    
+    @Test("WatchdogService CadenceMode intervals are correctly configured")
+    func testCadenceModeIntervals() {
+        #expect(WatchdogService.CadenceMode.nominal.interval == 6.0)
+        #expect(WatchdogService.CadenceMode.warm.interval == 3.0)
+        #expect(WatchdogService.CadenceMode.alert.interval == 1.5)
+    }
 }

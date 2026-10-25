@@ -11,8 +11,17 @@ public final class ProcessEnumerator: @unchecked Sendable {
         let residentBytes: UInt64
     }
     
+    private struct CachedProcessInfo {
+        let name: String
+        let path: String
+        let startTime: UInt64
+    }
+    
     private let timebaseNumer: Double
     private let timebaseDenom: Double
+    private var pathCache: [Int32: CachedProcessInfo] = [:]
+    private var pruneCounter: Int = 0
+    private let lock = NSLock()
     
     public init() {
         var timebase = mach_timebase_info_data_t()
@@ -35,6 +44,10 @@ public final class ProcessEnumerator: @unchecked Sendable {
         guard bytesWritten > 0 else { return [:] }
         
         var map: [Int32: RawProcessSample] = [:]
+        var pathBuffer = [CChar](repeating: 0, count: 4096)
+        
+        lock.lock()
+        defer { lock.unlock() }
         
         for pid in pids where pid > 0 {
             var bsdInfo = proc_bsdinfo()
@@ -63,18 +76,29 @@ public final class ProcessEnumerator: @unchecked Sendable {
                 ? taskInfo.pti_resident_size
                 : 0
             
-            let nameWithMirror = Mirror(reflecting: bsdInfo.pbi_name)
-            let nameChars = nameWithMirror.children.compactMap { $0.value as? CChar }
-            let name = nameChars.withUnsafeBufferPointer { ptr in
-                ptr.baseAddress.map { String(cString: $0) } ?? ""
-            }
+            let startTime = bsdInfo.pbi_start_tvsec
+            let cached = pathCache[pid]
+            let name: String
+            let fullPath: String
             
-            var pathBuffer = [CChar](repeating: 0, count: 4096)
-            var fullPath = ""
-            if proc_pidpath(pid, &pathBuffer, 4096) > 0 {
-                fullPath = pathBuffer.withUnsafeBufferPointer { ptr in
+            if let cached = cached, cached.startTime == startTime {
+                name = cached.name
+                fullPath = cached.path
+            } else {
+                let nameWithMirror = Mirror(reflecting: bsdInfo.pbi_name)
+                let nameChars = nameWithMirror.children.compactMap { $0.value as? CChar }
+                name = nameChars.withUnsafeBufferPointer { ptr in
                     ptr.baseAddress.map { String(cString: $0) } ?? ""
                 }
+                
+                var path = ""
+                if proc_pidpath(pid, &pathBuffer, 4096) > 0 {
+                    path = pathBuffer.withUnsafeBufferPointer { ptr in
+                        ptr.baseAddress.map { String(cString: $0) } ?? ""
+                    }
+                }
+                fullPath = path
+                pathCache[pid] = CachedProcessInfo(name: name, path: fullPath, startTime: startTime)
             }
             
             map[pid] = RawProcessSample(
@@ -85,6 +109,13 @@ public final class ProcessEnumerator: @unchecked Sendable {
                 totalTimeTicks: totalTime,
                 residentBytes: residentBytes
             )
+        }
+        
+        pruneCounter += 1
+        if pruneCounter >= 10 {
+            pruneCounter = 0
+            let activePidSet = Set(pids)
+            pathCache = pathCache.filter { activePidSet.contains($0.key) }
         }
         
         return map
