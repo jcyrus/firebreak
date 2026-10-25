@@ -44,3 +44,7 @@ targets:
       PRODUCT_BUNDLE_IDENTIFIER: com.jcyrus.firebreak
       INFOPLIST_FILE: Sources/FirebreakApp/Info.plist
       GENERATE_INFOPLIST_KEY_LSUIElement: YES
+      GENERATE_INFOPLIST_KEY_CFBundleIconFile: AppIcon
+      GENERATE_INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+      CODE_SIGN_ENTITLEMENTS: Sources/FirebreakApp/Firebreak.entitlements
+      DEVELOPMENT_TEAM: JVXU55D96B

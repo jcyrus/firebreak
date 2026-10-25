@@ -33,7 +33,7 @@ let package = Package(
             name: "FirebreakApp",
             dependencies: ["FirebreakCore"],
             path: "Sources/FirebreakApp",
-            exclude: ["Info.plist"]
+            exclude: ["Info.plist", "AppIcon.icns", "AppIcon.png", "Firebreak.entitlements"]
         ),
         .testTarget(
             name: "FirebreakCoreTests",
