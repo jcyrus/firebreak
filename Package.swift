@@ -8,7 +8,8 @@ let package = Package(
     ],
     products: [
         .library(name: "FirebreakCore", targets: ["FirebreakCore"]),
-        .executable(name: "firebreak", targets: ["firebreak"])
+        .executable(name: "firebreak", targets: ["firebreak"]),
+        .executable(name: "FirebreakApp", targets: ["FirebreakApp"])
     ],
     dependencies: [],
     targets: [
@@ -21,6 +22,12 @@ let package = Package(
             name: "firebreak",
             dependencies: ["FirebreakCore"],
             path: "Sources/firebreak"
+        ),
+        .executableTarget(
+            name: "FirebreakApp",
+            dependencies: ["FirebreakCore"],
+            path: "Sources/FirebreakApp",
+            exclude: ["Info.plist"]
         ),
         .testTarget(
             name: "FirebreakCoreTests",

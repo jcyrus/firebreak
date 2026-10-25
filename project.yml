@@ -1,0 +1,38 @@
+name: Firebreak
+options:
+  bundleIdPrefix: com.jcyrus
+  deploymentTarget:
+    macOS: "14.0"
+targets:
+  FirebreakCore:
+    type: framework
+    platform: macOS
+    sources:
+      - Sources/FirebreakCore
+    settings:
+      SWIFT_VERSION: "6.0"
+      
+  firebreak:
+    type: tool
+    platform: macOS
+    sources:
+      - Sources/firebreak
+    dependencies:
+      - target: FirebreakCore
+    settings:
+      SWIFT_VERSION: "6.0"
+
+  FirebreakApp:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/FirebreakApp
+    dependencies:
+      - target: FirebreakCore
+    info:
+      path: Sources/FirebreakApp/Info.plist
+    settings:
+      SWIFT_VERSION: "6.0"
+      PRODUCT_BUNDLE_IDENTIFIER: com.jcyrus.firebreak
+      INFOPLIST_FILE: Sources/FirebreakApp/Info.plist
+      GENERATE_INFOPLIST_KEY_LSUIElement: YES
