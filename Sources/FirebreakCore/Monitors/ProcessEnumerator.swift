@@ -7,11 +7,19 @@ public final class ProcessEnumerator: @unchecked Sendable {
         let ppid: Int32
         let name: String
         let path: String
-        let totalTimeNs: UInt64
+        let totalTimeTicks: UInt64
         let residentBytes: UInt64
     }
     
-    public init() {}
+    private let timebaseNumer: Double
+    private let timebaseDenom: Double
+    
+    public init() {
+        var timebase = mach_timebase_info_data_t()
+        mach_timebase_info(&timebase)
+        self.timebaseNumer = Double(timebase.numer)
+        self.timebaseDenom = Double(timebase.denom)
+    }
     
     private func collectRawSamples() -> [Int32: RawProcessSample] {
         let count = proc_listpids(UInt32(PROC_ALL_PIDS), 0, nil, 0)
@@ -74,7 +82,7 @@ public final class ProcessEnumerator: @unchecked Sendable {
                 ppid: Int32(bsdInfo.pbi_ppid),
                 name: name,
                 path: fullPath,
-                totalTimeNs: totalTime,
+                totalTimeTicks: totalTime,
                 residentBytes: residentBytes
             )
         }
@@ -83,20 +91,24 @@ public final class ProcessEnumerator: @unchecked Sendable {
     }
     
     public func snapshot(sampleInterval: TimeInterval = 0.3) async -> [ProcessNode] {
+        let t0 = mach_absolute_time()
         let firstSamples = collectRawSamples()
         let intervalUs = UInt32(max(0.1, sampleInterval) * 1_000_000)
         usleep(intervalUs)
+        let t1 = mach_absolute_time()
         let secondSamples = collectRawSamples()
         
         var nodes: [ProcessNode] = []
-        let durationNs = Double(intervalUs) * 1_000.0
+        let elapsedNs = Double(t1 - t0) * timebaseNumer / timebaseDenom
+        guard elapsedNs > 0 else { return [] }
         
         for (pid, second) in secondSamples {
             var cpuPct = 0.0
             if let first = firstSamples[pid] {
-                if second.totalTimeNs >= first.totalTimeNs {
-                    let diffNs = Double(second.totalTimeNs - first.totalTimeNs)
-                    cpuPct = (diffNs / durationNs) * 100.0
+                if second.totalTimeTicks >= first.totalTimeTicks {
+                    let diffTicks = Double(second.totalTimeTicks - first.totalTimeTicks)
+                    let diffNs = diffTicks * timebaseNumer / timebaseDenom
+                    cpuPct = (diffNs / elapsedNs) * 100.0
                 }
             }
             

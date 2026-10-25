@@ -41,8 +41,21 @@ public struct MenuBarView: View {
                 .font(.system(size: 16, weight: .bold))
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("Firebreak")
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Text("Firebreak")
+                        .font(.headline)
+                    if let temp = watchdog.currentThermal.temperatureCelsius {
+                        Text(String(format: "%.1f°C", temp))
+                            .font(.system(.caption, design: .monospaced, weight: .bold))
+                            .foregroundColor(temp >= 65.0 ? .red : (temp >= 55.0 ? .orange : .green))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill((temp >= 65.0 ? Color.red : (temp >= 55.0 ? Color.orange : Color.green)).opacity(0.15))
+                            )
+                    }
+                }
                 Text(watchdog.currentThermal.state.rawValue)
                     .font(.caption)
                     .foregroundColor(.secondary)

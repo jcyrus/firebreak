@@ -40,7 +40,11 @@ public struct AnomalyReport: Sendable, Codable {
 }
 
 public final class AnomalyDetector: Sendable {
-    public init() {}
+    public let temperatureThresholdCelsius: Double
+    
+    public init(temperatureThresholdCelsius: Double = 65.0) {
+        self.temperatureThresholdCelsius = temperatureThresholdCelsius
+    }
     
     public func analyze(thermal: ThermalStatus, swarms: [ProcessSwarm]) -> AnomalyReport {
         let topSwarm = swarms.first
@@ -49,7 +53,19 @@ public final class AnomalyDetector: Sendable {
         let topName = topSwarm?.displayName ?? "Unknown"
         let isSim = topSwarm?.category == .simulator
         
-        // 1. Critical condition: Native thermal state is serious/critical OR load average is severely saturated (>15.0 on 8-core)
+        // 1. Primary Hardware Temperature Trip (>= 65°C)
+        if let temp = thermal.temperatureCelsius, temp >= temperatureThresholdCelsius {
+            let action: AnomalyReport.RecommendedAction = isSim ? .shutdownSimulator : .freezeSwarm
+            let summary = "🔥 THERMAL TRIP: Hardware temperature reached \(String(format: "%.1f", temp))°C (threshold: \(String(format: "%.0f", temperatureThresholdCelsius))°C). Top swarm: \(topName) (\(String(format: "%.1f", topCPU))% CPU across \(topCount) processes)."
+            return AnomalyReport(
+                severity: .critical,
+                culpritSwarm: topSwarm,
+                summary: summary,
+                recommendedAction: action
+            )
+        }
+        
+        // 2. Critical condition: Native thermal state is serious/critical OR load average is severely saturated
         if thermal.state.isElevated || (thermal.loadAverage1Min > Double(thermal.coreCount) * 2.0 && topCPU > 200.0) {
             let action: AnomalyReport.RecommendedAction = isSim ? .shutdownSimulator : .killSwarm
             let summary = "🔥 CRITICAL: \(topName) is consuming \(String(format: "%.1f", topCPU))% CPU across \(topCount) processes while system load is \(String(format: "%.2f", thermal.loadAverage1Min))."

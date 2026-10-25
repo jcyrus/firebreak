@@ -89,6 +89,11 @@ struct FirebreakCLI {
     
     private static func printThermal(_ t: ThermalStatus) {
         let loadStr = String(format: "%.2f / %.2f / %.2f (%d cores)", t.loadAverage1Min, t.loadAverage5Min, t.loadAverage15Min, t.coreCount)
+        if let temp = t.temperatureCelsius {
+            print(String(format: "Hardware Temp : %.1f °C", temp))
+        } else {
+            print("Hardware Temp : Unknown (fallback mode)")
+        }
         print("Thermal State : \(t.state.rawValue)")
         print("Load Averages : \(loadStr)")
     }

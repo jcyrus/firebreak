@@ -14,8 +14,14 @@ let package = Package(
     dependencies: [],
     targets: [
         .target(
-            name: "FirebreakCore",
+            name: "FirebreakNative",
             dependencies: [],
+            path: "Sources/FirebreakNative",
+            publicHeadersPath: "include"
+        ),
+        .target(
+            name: "FirebreakCore",
+            dependencies: ["FirebreakNative"],
             path: "Sources/FirebreakCore"
         ),
         .executableTarget(

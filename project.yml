@@ -4,11 +4,19 @@ options:
   deploymentTarget:
     macOS: "14.0"
 targets:
+  FirebreakNative:
+    type: framework
+    platform: macOS
+    sources:
+      - Sources/FirebreakNative
+
   FirebreakCore:
     type: framework
     platform: macOS
     sources:
       - Sources/FirebreakCore
+    dependencies:
+      - target: FirebreakNative
     settings:
       SWIFT_VERSION: "6.0"
       
