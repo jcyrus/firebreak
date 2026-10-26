@@ -5,7 +5,8 @@ set -euo pipefail
 ROOT="${0:A:h:h}"
 cd "$ROOT"
 
-VERSION="1.0.0"
+# Single source of truth: the app's Info.plist (kept in sync with project.yml).
+VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$ROOT/Sources/FirebreakApp/Info.plist")"
 DMG_NAME="Firebreak-${VERSION}.dmg"
 DMG_PATH="$ROOT/dist/${DMG_NAME}"
 STAGING="$ROOT/dist/dmg_staging"
