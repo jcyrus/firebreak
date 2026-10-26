@@ -36,6 +36,14 @@ public struct ProcessSwarm: Sendable, Identifiable, Codable {
         processes.count
     }
     
+    public var frozenProcessCount: Int {
+        processes.filter(\.isStopped).count
+    }
+    
+    public var isFrozen: Bool {
+        processes.contains(where: \.isStopped)
+    }
+    
     public var isSwarmAnomaly: Bool {
         // Either multi-process swarm taking > 150% CPU, or more than 10 child processes pinned
         (totalCPUPercent > 120.0 && processCount >= 3) || totalCPUPercent > 250.0 || processCount >= 20

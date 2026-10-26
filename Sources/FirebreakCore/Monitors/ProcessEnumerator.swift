@@ -9,6 +9,7 @@ public final class ProcessEnumerator: @unchecked Sendable {
         let path: String
         let totalTimeTicks: UInt64
         let residentBytes: UInt64
+        let isStopped: Bool
     }
     
     private struct CachedProcessInfo {
@@ -107,7 +108,8 @@ public final class ProcessEnumerator: @unchecked Sendable {
                 name: name,
                 path: fullPath,
                 totalTimeTicks: totalTime,
-                residentBytes: residentBytes
+                residentBytes: residentBytes,
+                isStopped: bsdInfo.pbi_status == UInt32(SSTOP)
             )
         }
         
@@ -124,8 +126,8 @@ public final class ProcessEnumerator: @unchecked Sendable {
     public func snapshot(sampleInterval: TimeInterval = 0.3) async -> [ProcessNode] {
         let t0 = mach_absolute_time()
         let firstSamples = collectRawSamples()
-        let intervalUs = UInt32(max(0.1, sampleInterval) * 1_000_000)
-        usleep(intervalUs)
+        // Suspend rather than usleep so the cooperative pool thread stays free under load.
+        try? await Task.sleep(nanoseconds: UInt64(max(0.1, sampleInterval) * 1_000_000_000))
         let t1 = mach_absolute_time()
         let secondSamples = collectRawSamples()
         
@@ -149,7 +151,8 @@ public final class ProcessEnumerator: @unchecked Sendable {
                 name: second.name,
                 path: second.path,
                 cpuPercent: cpuPct,
-                residentMemoryBytes: second.residentBytes
+                residentMemoryBytes: second.residentBytes,
+                isStopped: second.isStopped
             ))
         }
         

@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import FirebreakCore
 
 @Suite("FirebreakCore Tests")
@@ -64,5 +65,71 @@ struct FirebreakCoreTests {
         #expect(WatchdogService.CadenceMode.nominal.interval == 6.0)
         #expect(WatchdogService.CadenceMode.warm.interval == 3.0)
         #expect(WatchdogService.CadenceMode.alert.interval == 1.5)
+    }
+    
+    @Test("Freeze is detected as stopped and thaw resumes only stopped processes")
+    func testFreezeThawRoundTrip() async throws {
+        let sleeper = Process()
+        sleeper.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        sleeper.arguments = ["30"]
+        try sleeper.run()
+        defer { sleeper.terminate() }
+        
+        let pid = sleeper.processIdentifier
+        let node = ProcessNode(pid: pid, ppid: getpid(), name: "sleep", path: "/bin/sleep", cpuPercent: 0, residentMemoryBytes: 0)
+        let swarm = ProcessSwarm(groupKey: "test_sleep", displayName: "sleep", category: .app, processes: [node])
+        let controller = ProcessController()
+        let enumerator = ProcessEnumerator()
+        
+        #expect(controller.freeze(swarm: swarm).delivered == 1)
+        let frozen = await enumerator.snapshot(sampleInterval: 0.05).first { $0.pid == pid }
+        #expect(frozen?.isStopped == true)
+        
+        let frozenSwarm = ProcessSwarm(groupKey: "test_sleep", displayName: "sleep", category: .app, processes: [try #require(frozen)])
+        #expect(frozenSwarm.isFrozen)
+        #expect(controller.thaw(swarm: frozenSwarm).delivered == 1)
+        
+        let resumed = await enumerator.snapshot(sampleInterval: 0.05).first { $0.pid == pid }
+        #expect(resumed?.isStopped == false)
+    }
+    
+    @Test("Protected processes and self are never signaled")
+    func testProtectedProcessesSkipped() {
+        let selfNode = ProcessNode(pid: getpid(), ppid: 1, name: "xctest", path: "", cpuPercent: 0, residentMemoryBytes: 0)
+        let dock = ProcessNode(pid: 999_999, ppid: 1, name: "Dock", path: "", cpuPercent: 0, residentMemoryBytes: 0)
+        let swarm = ProcessSwarm(groupKey: "protected", displayName: "protected", category: .system, processes: [selfNode, dock])
+        let outcome = ProcessController().freeze(swarm: swarm)
+        #expect(outcome.skipped == 2)
+        #expect(outcome.delivered == 0)
+    }
+    
+    @Test("Menu bar title covers normal, tripped, no-sensor and disabled states")
+    func testMenuBarTitle() {
+        let normal = AnomalyReport(severity: .normal, culpritSwarm: nil, summary: "", recommendedAction: .none)
+        let hog = ProcessNode(pid: 500, ppid: 1, name: "hog", path: "", cpuPercent: 238, residentMemoryBytes: 0)
+        let culprit = ProcessSwarm(groupKey: "hog", displayName: "hog", category: .app, processes: [hog])
+        let tripped = AnomalyReport(severity: .critical, culpritSwarm: culprit, summary: "", recommendedAction: .killSwarm)
+        
+        #expect(MenuBarTitle.make(temperatureCelsius: 55.6, showTemperature: true, report: normal, showCPU: true) == " 56°")
+        #expect(MenuBarTitle.make(temperatureCelsius: 71.2, showTemperature: true, report: tripped, showCPU: true) == " 71° · 240%")
+        #expect(MenuBarTitle.make(temperatureCelsius: 71.2, showTemperature: true, report: tripped, showCPU: false) == " 71°")
+        #expect(MenuBarTitle.make(temperatureCelsius: nil, showTemperature: true, report: tripped, showCPU: true) == " 240%")
+        #expect(MenuBarTitle.make(temperatureCelsius: nil, showTemperature: true, report: normal, showCPU: true) == "")
+        #expect(MenuBarTitle.make(temperatureCelsius: 55.6, showTemperature: false, report: normal, showCPU: true) == "")
+    }
+    
+    @Test("CPU core temperature reads a plausible value on hardware with sensors")
+    func testAverageDieTemperature() {
+        let monitor = ThermalMonitor()
+        guard let hottest = monitor.currentStatus().temperatureCelsius else { return }
+        let average = monitor.cpuTemperatureCelsius()
+        #expect(average != nil)
+        if let average {
+            #expect(average > 15 && average < 120)
+            #expect(abs(average - hottest) < 10)
+        }
+        if let core = monitor.hottestCPUCoreCelsius(), let average {
+            #expect(core >= average)
+        }
     }
 }

@@ -15,8 +15,9 @@ public final class DomainRecipes: Sendable {
         
         do {
             try task.run()
-            task.waitUntilExit()
+            // Drain before waiting: a full pipe buffer would otherwise deadlock simctl.
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            task.waitUntilExit()
             let out = String(data: data, encoding: .utf8) ?? ""
             return (task.terminationStatus, out)
         } catch {

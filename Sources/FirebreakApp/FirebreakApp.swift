@@ -4,45 +4,42 @@ import FirebreakCore
 
 @main
 struct FirebreakApp: App {
-    @State private var watchdog = WatchdogService()
-    
-    init() {
-        NSApplication.shared.setActivationPolicy(.accessory)
-    }
-    
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
-        MenuBarExtra {
-            MenuBarView(watchdog: watchdog)
-                .onAppear {
-                    watchdog.startMonitoring()
-                }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: menuBarIcon)
-                if watchdog.latestReport.isTripped {
-                    Text(shortAlertLabel)
-                        .font(.system(.caption2, design: .monospaced, weight: .bold))
-                }
-            }
-        }
-        .menuBarExtraStyle(.window)
-    }
-    
-    private var menuBarIcon: String {
-        switch watchdog.latestReport.severity {
-        case .critical:
-            return "exclamationmark.triangle.fill"
-        case .warning:
-            return "flame.fill"
-        case .normal:
-            return "flame"
+        // The menu bar UI is an AppKit NSStatusItem owned by AppDelegate. SwiftUI's MenuBarExtra
+        // rebuilds its label on every observed change, which drops clicks and dismisses the panel
+        // while the alert cadence is updating the CPU% every 1.5s.
+        //
+        // SwiftUI still needs one scene. A never-inserted MenuBarExtra owns no window, unlike
+        // `Settings { EmptyView() }`, which macOS restored on relaunch as a blank "Firebreak Settings" window.
+        MenuBarExtra("Firebreak", systemImage: "flame", isInserted: .constant(false)) {
+            EmptyView()
         }
     }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let watchdog = WatchdogService()
+    private let preferences = AppPreferences()
+    private var statusItemController: StatusItemController?
+    private var settingsWindowController: SettingsWindowController?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+        let settings = SettingsWindowController(watchdog: watchdog, preferences: preferences)
+        settingsWindowController = settings
+        statusItemController = StatusItemController(
+            watchdog: watchdog,
+            preferences: preferences,
+            openSettings: { settings.show() }
+        )
+        // Monitor from launch so the menu bar badge is live before the popover is ever opened.
+        watchdog.startMonitoring()
+    }
     
-    private var shortAlertLabel: String {
-        if let culprit = watchdog.latestReport.culpritSwarm {
-            return String(format: "%.0f%%", culprit.totalCPUPercent)
-        }
-        return "WARN"
+    func applicationWillTerminate(_ notification: Notification) {
+        watchdog.resumeFrozenOnQuit()
     }
 }

@@ -8,6 +8,8 @@ public struct ProcessNode: Sendable, Identifiable, Codable {
     public let path: String
     public let cpuPercent: Double
     public let residentMemoryBytes: UInt64
+    /// True when the kernel reports the process as stopped (SIGSTOP / frozen).
+    public let isStopped: Bool
     
     public init(
         pid: Int32,
@@ -15,7 +17,8 @@ public struct ProcessNode: Sendable, Identifiable, Codable {
         name: String,
         path: String,
         cpuPercent: Double,
-        residentMemoryBytes: UInt64
+        residentMemoryBytes: UInt64,
+        isStopped: Bool = false
     ) {
         self.pid = pid
         self.ppid = ppid
@@ -23,6 +26,7 @@ public struct ProcessNode: Sendable, Identifiable, Codable {
         self.path = path
         self.cpuPercent = cpuPercent
         self.residentMemoryBytes = residentMemoryBytes
+        self.isStopped = isStopped
     }
     
     public var isSimulatorExtension: Bool {

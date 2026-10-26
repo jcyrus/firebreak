@@ -28,9 +28,17 @@ Unlike passive monitors that only show a temperature reading in the menu bar, Fi
 
 ### Menu Bar App (recommended: bundled)
 ```zsh
-./scripts/bundle-app.sh
-open dist/Firebreak.app
+./scripts/bundle-app.sh --install
+open /Applications/Firebreak.app
 ```
+`--install` copies the app to `/Applications` and unregisters stale copies (`dist/`, Xcode DerivedData,
+archives). On macOS 26+ this is required: with several registered copies, Firebreak doesn't appear under
+**System Settings › Menu Bar** and its icon gets hidden when menu bar managers like Hidden Bar collapse.
+Make sure Firebreak is allowed there after the first install.
+
+The menu bar shows the average CPU die temperature (refreshed every 2s) next to the flame, plus the
+culprit's CPU % when the breaker trips. Both can be toggled in **Settings › General**.
+
 Interactive notification buttons (Shutdown / Freeze / Kill) require the bundled `.app`.
 `swift run FirebreakApp` also works for development, but alerts fall back to plain
 `osascript` banners without action buttons.

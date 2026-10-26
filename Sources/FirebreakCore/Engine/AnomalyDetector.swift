@@ -42,7 +42,7 @@ public struct AnomalyReport: Sendable, Codable {
 public final class AnomalyDetector: Sendable {
     public let temperatureThresholdCelsius: Double
     
-    public init(temperatureThresholdCelsius: Double = 65.0) {
+    public init(temperatureThresholdCelsius: Double = 85.0) {
         self.temperatureThresholdCelsius = temperatureThresholdCelsius
     }
     

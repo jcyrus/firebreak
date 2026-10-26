@@ -143,7 +143,10 @@ public final class ThermalNotificationManager: NSObject, @unchecked Sendable, UN
         
         switch response.actionIdentifier {
         case Self.actionShutdownSimulator:
-            _ = DomainRecipes().shutdownAllSimulators()
+            // simctl can block for seconds under load; keep it off the delegate (main) thread.
+            DispatchQueue.global(qos: .userInitiated).async {
+                _ = DomainRecipes().shutdownAllSimulators()
+            }
         case Self.actionFreezeSwarm:
             if let swarm { controller.freeze(swarm: swarm) }
         case Self.actionKillSwarm:

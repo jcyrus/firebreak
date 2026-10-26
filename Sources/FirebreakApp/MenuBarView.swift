@@ -3,10 +3,12 @@ import FirebreakCore
 
 public struct MenuBarView: View {
     @Bindable var watchdog: WatchdogService
-    @State private var selectedSwarm: ProcessSwarm?
+    @State private var expandedSwarmKey: String?
+    private let onOpenSettings: () -> Void
     
-    public init(watchdog: WatchdogService) {
+    public init(watchdog: WatchdogService, onOpenSettings: @escaping () -> Void = {}) {
         self.watchdog = watchdog
+        self.onOpenSettings = onOpenSettings
     }
     
     public var body: some View {
@@ -19,11 +21,24 @@ public struct MenuBarView: View {
             
             Divider()
             
+            if !watchdog.frozenSwarms.isEmpty {
+                frozenSection
+                
+                Divider()
+            }
+            
             swarmsSection
             
             Divider()
             
             emergencyActionsSection
+            
+            if let message = watchdog.lastActionMessage {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
             
             Divider()
             
@@ -45,14 +60,15 @@ public struct MenuBarView: View {
                     Text("Firebreak")
                         .font(.headline)
                     if let temp = watchdog.currentThermal.temperatureCelsius {
+                        let threshold = watchdog.temperatureThresholdCelsius
                         Text(String(format: "%.1f°C", temp))
                             .font(.system(.caption, design: .monospaced, weight: .bold))
-                            .foregroundColor(temp >= 65.0 ? .red : (temp >= 55.0 ? .orange : .green))
+                            .foregroundColor(temp >= threshold ? .red : (temp >= threshold - 10.0 ? .orange : .green))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill((temp >= 65.0 ? Color.red : (temp >= 55.0 ? Color.orange : Color.green)).opacity(0.15))
+                                    .fill((temp >= threshold ? Color.red : (temp >= threshold - 10.0 ? Color.orange : Color.green)).opacity(0.15))
                             )
                     }
                 }
@@ -103,7 +119,7 @@ public struct MenuBarView: View {
                 HStack {
                     if culprit.category == .simulator {
                         Button("Shutdown All Simulators") {
-                            _ = watchdog.shutdownSimulators()
+                            Task { await watchdog.shutdownSimulators() }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.red)
@@ -134,6 +150,54 @@ public struct MenuBarView: View {
     }
     
     // MARK: - Swarms Section
+    // MARK: - Frozen Section
+    // Frozen swarms drop to ~0% CPU and fall out of the top-5 list, so they get their own
+    // always-visible section; otherwise there is no way back to Resume.
+    private var frozenSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("FROZEN")
+                    .font(.caption2.weight(.bold))
+                    .foregroundColor(.cyan)
+                Spacer()
+                if watchdog.frozenSwarms.count > 1 {
+                    Button("Resume All") { watchdog.resumeAllFrozen() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                }
+            }
+            
+            ForEach(watchdog.frozenSwarms) { swarm in
+                HStack(spacing: 8) {
+                    Image(systemName: "snowflake")
+                        .font(.system(size: 13))
+                        .foregroundColor(.cyan)
+                        .frame(width: 18)
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(swarm.displayName)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                        Text("\(swarm.frozenProcessCount) of \(swarm.processCount) processes frozen")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button("Resume") { watchdog.thaw(swarm: swarm) }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.cyan)
+                        .controlSize(.small)
+                    Button("Kill", role: .destructive) { watchdog.terminate(swarm: swarm, force: true) }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .controlSize(.small)
+                }
+            }
+        }
+    }
+    
     private var swarmsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -146,7 +210,7 @@ public struct MenuBarView: View {
                     .foregroundColor(.secondary)
             }
             
-            let topSwarms = Array(watchdog.activeSwarms.prefix(5))
+            let topSwarms = Array(watchdog.activeSwarms.filter { !$0.isFrozen }.prefix(5))
             if topSwarms.isEmpty {
                 Text("No active high-load swarms")
                     .font(.caption)
@@ -161,45 +225,56 @@ public struct MenuBarView: View {
     }
     
     private func swarmRow(_ swarm: ProcessSwarm) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: iconName(for: swarm.category))
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
-                .frame(width: 18)
-            
-            VStack(alignment: .leading, spacing: 1) {
-                Text(swarm.displayName)
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1)
-                Text("\(swarm.processCount) processes")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            Text(String(format: "%.1f%%", swarm.totalCPUPercent))
-                .font(.system(.caption, design: .monospaced, weight: .semibold))
-                .foregroundColor(cpuColor(swarm.totalCPUPercent))
-            
-            Menu {
-                Button("Freeze (SIGSTOP)") {
-                    watchdog.freeze(swarm: swarm)
-                }
-                Button("Resume (SIGCONT)") {
-                    watchdog.thaw(swarm: swarm)
-                }
-                Divider()
-                Button("Force Kill (SIGKILL)", role: .destructive) {
-                    watchdog.terminate(swarm: swarm, force: true)
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
+        let isExpanded = expandedSwarmKey == swarm.groupKey
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: iconName(for: swarm.category))
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
+                    .frame(width: 18)
+                
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(swarm.displayName)
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                    Text("\(swarm.processCount) processes")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Text(String(format: "%.1f%%", swarm.totalCPUPercent))
+                    .font(.system(.caption, design: .monospaced, weight: .semibold))
+                    .foregroundColor(cpuColor(swarm.totalCPUPercent))
+                
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .frame(width: 14)
             }
-            .menuStyle(.borderlessButton)
-            .frame(width: 20)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                expandedSwarmKey = isExpanded ? nil : swarm.groupKey
+            }
+            
+            // Inline buttons instead of a Menu: an open NSMenu is torn down when the row
+            // re-renders on the next watchdog tick, which made Kill unreachable under load.
+            if isExpanded {
+                HStack(spacing: 6) {
+                    Button("Freeze") { watchdog.freeze(swarm: swarm) }
+                        .tint(.orange)
+                    Button("Resume") { watchdog.thaw(swarm: swarm) }
+                    Button("Kill", role: .destructive) {
+                        watchdog.terminate(swarm: swarm, force: true)
+                        expandedSwarmKey = nil
+                    }
+                    .tint(.red)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .padding(.leading, 26)
+            }
         }
         .padding(.vertical, 2)
     }
@@ -213,7 +288,7 @@ public struct MenuBarView: View {
             
             HStack(spacing: 8) {
                 Button {
-                    _ = watchdog.shutdownSimulators()
+                    Task { await watchdog.shutdownSimulators() }
                 } label: {
                     Label("Shutdown Simulators", systemImage: "iphone.slash")
                         .font(.caption)
@@ -245,6 +320,16 @@ public struct MenuBarView: View {
                 .foregroundColor(.secondary)
             
             Spacer()
+            
+            Button {
+                onOpenSettings()
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .help("Settings")
             
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
