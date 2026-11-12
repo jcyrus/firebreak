@@ -118,6 +118,38 @@ struct FirebreakCoreTests {
         #expect(MenuBarTitle.make(temperatureCelsius: 55.6, showTemperature: false, report: normal, showCPU: true) == "")
     }
     
+    @Test("Detector trips on system-wide signals when no processes are visible")
+    func testSystemOnlyDetection() {
+        func status(_ state: ThermalStatus.State, load: Double, temp: Double? = nil) -> ThermalStatus {
+            ThermalStatus(state: state, temperatureCelsius: temp, loadAverage1Min: load, loadAverage5Min: load, loadAverage15Min: load, coreCount: 8)
+        }
+        let detector = AnomalyDetector(temperatureThresholdCelsius: 85)
+        
+        let calm = detector.analyze(thermal: status(.nominal, load: 3), swarms: [])
+        #expect(!calm.isTripped)
+        
+        let throttling = detector.analyze(thermal: status(.serious, load: 3), swarms: [])
+        #expect(throttling.severity == .critical)
+        #expect(throttling.culpritSwarm == nil)
+        #expect(throttling.recommendedAction == .none)
+        #expect(throttling.summary.contains("Serious thermal pressure"))
+        
+        let saturated = detector.analyze(thermal: status(.nominal, load: 16.5), swarms: [])
+        #expect(saturated.severity == .warning)
+        #expect(saturated.summary.contains("16.50 on 8 cores"))
+        
+        let hot = detector.analyze(thermal: status(.nominal, load: 3, temp: 91), swarms: [])
+        #expect(hot.severity == .critical)
+    }
+    
+    @Test("Process counts read naturally in singular and plural")
+    func testProcessCountText() {
+        let one = ProcessNode(pid: 500, ppid: 1, name: "a", path: "", cpuPercent: 1, residentMemoryBytes: 0)
+        let two = ProcessNode(pid: 501, ppid: 1, name: "b", path: "", cpuPercent: 1, residentMemoryBytes: 0)
+        #expect(ProcessSwarm(groupKey: "a", displayName: "a", category: .app, processes: [one]).processCountText == "1 process")
+        #expect(ProcessSwarm(groupKey: "a", displayName: "a", category: .app, processes: [one, two]).processCountText == "2 processes")
+    }
+    
     @Test("CPU core temperature reads a plausible value on hardware with sensors")
     func testAverageDieTemperature() {
         let monitor = ThermalMonitor()

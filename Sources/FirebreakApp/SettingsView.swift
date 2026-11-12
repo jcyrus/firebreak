@@ -68,8 +68,11 @@ private struct GeneralSettingsTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
-                Toggle("Show culprit CPU % when tripped", isOn: $preferences.showCPUInMenuBar)
-                Text("When the breaker trips, the top swarm's CPU usage is added after the temperature.")
+                Toggle(WatchdogService.canInspectProcesses ? "Show culprit CPU % when tripped" : "Show WARN when tripped",
+                       isOn: $preferences.showCPUInMenuBar)
+                Text(WatchdogService.canInspectProcesses
+                     ? "When the breaker trips, the top swarm's CPU usage is added after the temperature."
+                     : "When the breaker trips, WARN is shown next to the flame.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -89,7 +92,9 @@ private struct MonitoringSettingsTab: View {
             Section {
                 Toggle("Notify when the breaker trips", isOn: $watchdog.autoAlertEnabled)
             } footer: {
-                Text("Alerts are rate-limited to one per swarm every 60 seconds.")
+                Text(WatchdogService.canInspectProcesses
+                     ? "Alerts are rate-limited to one per swarm every 60 seconds."
+                     : "Alerts are rate-limited to one every 60 seconds.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -123,11 +128,13 @@ private struct MonitoringSettingsTab: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Protected processes") {
-                Text(ProcessController.protectedNames.sorted().joined(separator: ", "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+            if WatchdogService.canInspectProcesses {
+                Section("Protected processes") {
+                    Text(ProcessController.protectedNames.sorted().joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
             }
         }
         .formStyle(.grouped)

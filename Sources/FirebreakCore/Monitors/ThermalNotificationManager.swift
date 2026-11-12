@@ -13,6 +13,7 @@ public final class ThermalNotificationManager: NSObject, @unchecked Sendable, UN
     public static let actionShutdownSimulator = "ACTION_SHUTDOWN_SIMULATOR"
     public static let actionFreezeSwarm = "ACTION_FREEZE_SWARM"
     public static let actionKillSwarm = "ACTION_KILL_SWARM"
+    private static let systemCooldownKey = "system"
     
     /// True only when running from a bundled `.app` with a bundle identifier.
     public static var isRunningInAppBundle: Bool {
@@ -78,22 +79,26 @@ public final class ThermalNotificationManager: NSObject, @unchecked Sendable, UN
     }
     
     public func postAlert(for report: AnomalyReport) {
-        guard report.isTripped, let culprit = report.culpritSwarm else { return }
+        guard report.isTripped else { return }
+        // System-wide trips (no process visibility) have no culprit and share one cooldown slot.
+        let culprit = report.culpritSwarm
+        let cooldownKey = culprit?.groupKey ?? Self.systemCooldownKey
         
         let now = Date()
         lock.lock()
-        if let last = lastNotifiedTime[culprit.groupKey], now.timeIntervalSince(last) < cooldownInterval {
+        if let last = lastNotifiedTime[cooldownKey], now.timeIntervalSince(last) < cooldownInterval {
             lock.unlock()
             return
         }
-        lastNotifiedTime[culprit.groupKey] = now
-        pendingSwarms[culprit.groupKey] = culprit
+        lastNotifiedTime[cooldownKey] = now
+        if let culprit { pendingSwarms[culprit.groupKey] = culprit }
         lock.unlock()
         
-        let title = report.severity == .critical
-            ? "🔥 Thermal Critical: \(culprit.displayName)"
-            : "⚠️ High Thermal Load: \(culprit.displayName)"
-        let subtitle = "\(culprit.processCount) processes consuming \(String(format: "%.1f", culprit.totalCPUPercent))% CPU"
+        let headline = report.severity == .critical ? "🔥 Thermal Critical" : "⚠️ High Thermal Load"
+        let title = culprit.map { "\(headline): \($0.displayName)" } ?? headline
+        let subtitle = culprit.map {
+            "\($0.processCountText) consuming \(String(format: "%.1f", $0.totalCPUPercent))% CPU"
+        } ?? ""
         
         guard let center else {
             postFallbackBanner(title: title, subtitle: subtitle, body: report.summary)
@@ -105,11 +110,14 @@ public final class ThermalNotificationManager: NSObject, @unchecked Sendable, UN
         content.subtitle = subtitle
         content.body = report.summary
         content.sound = report.severity == .critical ? .defaultCritical : .default
-        content.categoryIdentifier = Self.categoryThermalAnomaly
-        content.userInfo = ["groupKey": culprit.groupKey]
+        if let culprit {
+            // Only culprit alerts carry the Shutdown / Freeze / Kill buttons.
+            content.categoryIdentifier = Self.categoryThermalAnomaly
+            content.userInfo = ["groupKey": culprit.groupKey]
+        }
         
         let request = UNNotificationRequest(
-            identifier: "firebreak-\(culprit.groupKey)-\(Int(now.timeIntervalSince1970))",
+            identifier: "firebreak-\(cooldownKey)-\(Int(now.timeIntervalSince1970))",
             content: content,
             trigger: nil
         )
