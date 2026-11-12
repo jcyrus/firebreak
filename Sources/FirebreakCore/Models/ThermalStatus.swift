@@ -17,6 +17,17 @@ public struct ThermalStatus: Sendable, Codable {
             }
         }
         
+        /// macOS thermal pressure level without the gloss. Pressure can still read "Nominal" while
+        /// the cores are over the trip threshold, so UI that also shows a temperature uses this.
+        public var shortName: String {
+            switch self {
+            case .nominal: return "Nominal"
+            case .fair: return "Fair"
+            case .serious: return "Serious"
+            case .critical: return "Critical"
+            }
+        }
+        
         public var isElevated: Bool {
             self == .serious || self == .critical
         }

@@ -36,6 +36,11 @@ public struct ProcessSwarm: Sendable, Identifiable, Codable {
         processes.count
     }
     
+    /// "1 process" / "12 processes", for UI and alert text.
+    public var processCountText: String {
+        processCount == 1 ? "1 process" : "\(processCount) processes"
+    }
+    
     public var frozenProcessCount: Int {
         processes.filter(\.isStopped).count
     }

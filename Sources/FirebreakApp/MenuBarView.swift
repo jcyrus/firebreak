@@ -21,17 +21,21 @@ public struct MenuBarView: View {
             
             Divider()
             
-            if !watchdog.frozenSwarms.isEmpty {
-                frozenSection
+            if WatchdogService.canInspectProcesses {
+                if !watchdog.frozenSwarms.isEmpty {
+                    frozenSection
+                    
+                    Divider()
+                }
+                
+                swarmsSection
                 
                 Divider()
+                
+                emergencyActionsSection
+            } else {
+                systemLoadSection
             }
-            
-            swarmsSection
-            
-            Divider()
-            
-            emergencyActionsSection
             
             if let message = watchdog.lastActionMessage {
                 Text(message)
@@ -72,7 +76,7 @@ public struct MenuBarView: View {
                             )
                     }
                 }
-                Text(watchdog.currentThermal.state.rawValue)
+                Text("macOS thermal pressure: \(watchdog.currentThermal.state.shortName)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -178,7 +182,7 @@ public struct MenuBarView: View {
                         Text(swarm.displayName)
                             .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
-                        Text("\(swarm.frozenProcessCount) of \(swarm.processCount) processes frozen")
+                        Text("\(swarm.frozenProcessCount) of \(swarm.processCountText) frozen")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -237,7 +241,7 @@ public struct MenuBarView: View {
                     Text(swarm.displayName)
                         .font(.system(size: 13, weight: .medium))
                         .lineLimit(1)
-                    Text("\(swarm.processCount) processes")
+                    Text(swarm.processCountText)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -277,6 +281,37 @@ public struct MenuBarView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+    
+    // MARK: - System Load
+    /// Replaces the swarm list and remediation where the App Sandbox hides other processes.
+    private var systemLoadSection: some View {
+        let thermal = watchdog.currentThermal
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("SYSTEM LOAD")
+                .font(.caption2.weight(.bold))
+                .foregroundColor(.secondary)
+            
+            loadRow("Last minute", thermal.loadAverage1Min, cores: thermal.coreCount)
+            loadRow("Last 5 minutes", thermal.loadAverage5Min, cores: thermal.coreCount)
+            loadRow("Last 15 minutes", thermal.loadAverage15Min, cores: thermal.coreCount)
+            
+            Text("Load above \(thermal.coreCount) means more work is queued than your \(thermal.coreCount) cores can run at once. This edition watches system-wide load and macOS thermal pressure. App Store sandboxing does not let it see or stop individual apps.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+    
+    private func loadRow(_ label: String, _ load: Double, cores: Int) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+            Spacer()
+            Text(String(format: "%.2f", load))
+                .font(.system(.caption, design: .monospaced, weight: .bold))
+                .foregroundColor(load > Double(cores) * 2.0 ? .red : (load > Double(cores) ? .orange : .primary))
+        }
     }
     
     // MARK: - Emergency Actions

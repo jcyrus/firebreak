@@ -45,6 +45,14 @@ public final class WatchdogService: @unchecked Sendable {
     }
     public static let sensorInterval: TimeInterval = 2.0
     
+    /// False in the Mac App Store build: the App Sandbox denies process listing, signals and
+    /// `xcrun`, so that edition monitors system-wide thermal pressure and load only.
+    #if MAS_BUILD
+    public static let canInspectProcesses = false
+    #else
+    public static let canInspectProcesses = true
+    #endif
+    
     /// Swarms with at least one stopped process, read from kernel state rather than our own
     /// bookkeeping so freezes from notifications or a previous run still show up.
     public var frozenSwarms: [ProcessSwarm] {

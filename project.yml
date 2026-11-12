@@ -53,9 +53,15 @@ targets:
     platform: macOS
     bundleId: com.jcyrus.firebreak
     sources:
-      - Sources/FirebreakApp
+      - path: Sources/FirebreakApp
+        # The asset catalog supplies the icon; the loose copies are only for scripts/bundle-app.sh.
+        excludes:
+          - AppIcon.icns
+          - AppIcon.png
     dependencies:
       - target: FirebreakCore
+      # FirebreakCore links FirebreakNative; without embedding it the app dies in dyld at launch.
+      - target: FirebreakNative
     info:
       path: Sources/FirebreakApp/Info.plist
       properties:
@@ -66,9 +72,13 @@ targets:
         LSApplicationCategoryType: public.app-category.developer-tools
         LSUIElement: true
         ITSAppUsesNonExemptEncryption: false
+        NSHumanReadableCopyright: "© 2026 Cyrus Espiritu. MIT License."
     settings:
       base:
         SWIFT_VERSION: "6.0"
+        PRODUCT_NAME: Firebreak
+        # The CLI target's module is `firebreak`; keep the app's distinct on case-insensitive volumes.
+        PRODUCT_MODULE_NAME: FirebreakApp
         PRODUCT_BUNDLE_IDENTIFIER: com.jcyrus.firebreak
         INFOPLIST_FILE: Sources/FirebreakApp/Info.plist
         MARKETING_VERSION: "1.1.0"
